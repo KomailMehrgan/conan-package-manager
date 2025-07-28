@@ -1,50 +1,37 @@
 #include <iostream>
-#include <vector>
-
 #include <opencv2/opencv.hpp>
-#include "nlohmann/json.hpp"
-
-// for convenience
-using json = nlohmann::json;
+#include <openvino/openvino.hpp>
 
 int main() {
-    // 1. Define our drawing parameters using a JSON object
-    json config = {
-        {"image_width", 400},
-        {"image_height", 400},
-        {"circle", {
-            {"center_x", 200},
-            {"center_y", 200},
-            {"radius", 100},
-            {"color_bgr", {0, 255, 0}} // Blue, Green, Red
-        }}
-    };
-
-    std::cout << "--- Configuration ---" << std::endl;
-    std::cout << config.dump(4) << std::endl; // pretty-print the JSON
-    std::cout << "---------------------" << std::endl;
     std::cout << "OpenCV version: " << CV_VERSION << std::endl;
+    std::cout << "Creating a simple image..." << std::endl;
 
-    // 2. Parse values from the JSON object
-    int width = config["image_width"];
-    int height = config["image_height"];
+    // Create a black 400x400 image
+    cv::Mat image = cv::Mat::zeros(400, 400, CV_8UC3);
 
-    cv::Point center(
-        config["circle"]["center_x"],
-        config["circle"]["center_y"]
-    );
+    // Draw a solid green circle in the center
+    cv::circle(image, cv::Point(200, 200), 100, cv::Scalar(0, 255, 0), -1);
 
-    int radius = config["circle"]["radius"];
-
-    std::vector<int> color_vec = config["circle"]["color_bgr"];
-    cv::Scalar color(color_vec[0], color_vec[1], color_vec[2]);
+    // Display the image in a window
+    cv::imshow("OpenCV + Conan Demo", image);
 
 
-    // 3. Use the parsed values to create the image with OpenCV
-    cv::Mat image = cv::Mat::zeros(height, width, CV_8UC3);
-    cv::circle(image, center, radius, color, -1);
+    ov::Core core;
 
-    cv::imshow("OpenCV + JSON Demo", image);
+        
+        // This is the correct method for this version of the library.
+        std::cout << "OpenVINO version: " << core.get_versions("CPU").at("CPU") << std::endl;
+
+        //  Get the list of available inference devices
+        std::vector<std::string> devices = core.get_available_devices();
+
+        //  Print the available devices
+        std::cout << "Available devices:" << std::endl;
+        for (const auto& device : devices) {
+            std::cout << "  - " << device << std::endl;
+        }
+
+    // Wait for a key press before closing the window
     cv::waitKey(0);
 
     return 0;

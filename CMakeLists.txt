@@ -1,19 +1,18 @@
 cmake_minimum_required(VERSION 3.21)
-project(OpenCV_Conan_Demo CXX)
+project(manageAI CXX)
 
-# Find all the packages provided by Conan.
-# Each find_package call makes the corresponding targets available.
+# Set a C++ standard that is compatible with OpenVINO's dependencies.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find the OpenVINO package provided by Conan
+find_package(OpenVINO REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(nlohmann_json REQUIRED)
 
 # Add our executable program
 add_executable(main main.cpp)
 
-# Link our program against all the required libraries
-target_link_libraries(
-    main
-    PRIVATE
-    opencv::opencv
-    LibLZMA::LibLZMA
-    nlohmann_json::nlohmann_json
-)
+# Link our program against the OpenVINO library
+target_link_libraries(main PRIVATE openvino::openvino opencv::opencv LibLZMA::LibLZMA)
+
+

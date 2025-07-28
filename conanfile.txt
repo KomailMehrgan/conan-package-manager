@@ -1,7 +1,9 @@
 [requires]
+# We use opencv/4.11.0, but this method also works for other versions.
 opencv/4.11.0
 xz_utils/5.4.5
-nlohmann_json/3.11.3
+openvino/2025.2.0
+
 
 [generators]
 CMakeDeps
@@ -11,4 +13,6 @@ CMakeToolchain
 cmake_layout
 
 [options]
+# This is crucial: it forces Conan to use a shared library for xz_utils,
+# which resolves common linker errors with OpenCV on Windows.
 xz_utils/*:shared=True
