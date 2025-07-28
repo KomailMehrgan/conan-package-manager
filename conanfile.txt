@@ -3,6 +3,7 @@
 opencv/4.11.0
 xz_utils/5.4.5
 openvino/2025.2.0
+nlohmann_json/3.11.3
 
 
 [generators]
