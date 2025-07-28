@@ -1,14 +1,14 @@
-# Walkthrough: Modern C++ with OpenCV and Conan on Windows
+# Project: C++ with OpenCV and OpenVINO on Windows using Conan
 
-This guide provides a clear, step-by-step process for setting up a C++ project that uses the OpenCV library on Windows. We will use the [Conan C++ Package Manager](https://conan.io/) and [CMake](https://cmake.org/) to create a modern, reproducible build environment.
+This guide provides a complete and reliable walkthrough for building a C++ project that integrates both the **OpenCV** and **Intel OpenVINO™** libraries. The entire process is managed using the **Conan C++ Package Manager** and **CMake** for a modern, reproducible build environment on Windows.
 
-This walkthrough addresses common issues, such as linker errors (`LNK2019`) and runtime "missing DLL" errors, by providing a robust configuration from the start.
+This document consolidates the solutions to several common issues discovered during setup, including C++ standard conflicts, linker errors (`LNK2019`), and runtime "missing DLL" errors.
 
 ## Prerequisites
 
 Before you begin, ensure you have the following tools installed and accessible from your terminal:
 
-1.  **C++ Compiler:** A recent version of the Visual Studio C++ toolchain (the "Desktop development with C++" workload from the Visual Studio Installer is perfect).
+1.  **C++ Compiler:** A recent version of the Visual Studio C++ toolchain (the "Desktop development with C++" workload from the Visual Studio Installer is recommended).
 2.  **CMake:** Version 3.21 or newer.
 3.  **Conan:** Version 2.x.
 
@@ -16,19 +16,19 @@ You can verify your installations by running `cl`, `cmake --version`, and `conan
 
 ---
 
-## Step 1: Create the Project Files
+## Step 1: Project Files
 
-First, create a new folder for your project. Inside this folder, create the following three files.
+Your project should have the following three files in its root directory.
 
 ### 1. `conanfile.txt`
 
-This file tells Conan which libraries your project needs. We will require `opencv` and its problematic dependency, `xz_utils`, and configure it correctly.
+This file defines all the project's dependencies. It is configured to handle the specific requirements of both OpenCV and OpenVINO.
 
 ```txt
 [requires]
-# We use opencv/4.11.0, but this method also works for other versions.
 opencv/4.11.0
 xz_utils/5.4.5
+openvino/2025.2.0
 
 [generators]
 CMakeDeps
@@ -45,46 +45,69 @@ xz_utils/*:shared=True
 
 ### 2. `CMakeLists.txt`
 
-This is the build script for CMake. It defines how to compile our program and link it against the libraries provided by Conan.
+This build script tells CMake how to find all the libraries provided by Conan and link them together to build the final executable.
 
 ```cmake
 cmake_minimum_required(VERSION 3.21)
-project(OpenCV_Conan_Demo CXX)
+project(manageAI CXX)
 
-# This command finds the libraries (OpenCV and its dependencies)
-# that were downloaded by Conan.
+# Set a C++ standard that is compatible with OpenVINO's dependencies.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find all the required packages provided by Conan
+find_package(OpenVINO REQUIRED)
 find_package(OpenCV REQUIRED)
 
-# Add our executable program, which is created from main.cpp.
+# Add our executable program
 add_executable(main main.cpp)
 
-# This is the key to fixing the linker errors. We link our program
-# against both OpenCV and the LZMA library it depends on.
-target_link_libraries(main PRIVATE opencv::opencv LibLZMA::LibLZMA)
+# Link our program against all the necessary libraries.
+# This includes OpenCV, OpenVINO, and the manually specified LibLZMA
+# to resolve the linker errors from OpenCV's tiff dependency.
+target_link_libraries(
+    main
+    PRIVATE
+    openvino::openvino
+    opencv::opencv
+    LibLZMA::LibLZMA
+)
 ```
 
 ### 3. `main.cpp`
 
-This is our simple C++ program that uses OpenCV to create and display an image with a green circle.
+This program demonstrates that both libraries are working together. It uses OpenVINO to get system information and OpenCV to create and display a simple image.
 
 ```cpp
 #include <iostream>
+#include <vector>
 #include <opencv2/opencv.hpp>
+#include <openvino/openvino.hpp>
 
 int main() {
+    // --- OpenVINO Demonstration ---
+    try {
+        ov::Core core;
+        std::cout << "OpenVINO version: " << core.get_versions("CPU").at("CPU") << std::endl;
+
+        std::vector<std::string> devices = core.get_available_devices();
+        std::cout << "Available OpenVINO devices:" << std::endl;
+        for (const auto& device : devices) {
+            std::cout << "  - " << device << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "OpenVINO Exception: " << e.what() << std::endl;
+    }
+
+    std::cout << "\n--- OpenCV Demonstration ---" << std::endl;
     std::cout << "OpenCV version: " << CV_VERSION << std::endl;
-    std::cout << "Creating a simple image..." << std::endl;
 
-    // Create a black 400x400 image
+    // --- OpenCV Demonstration ---
     cv::Mat image = cv::Mat::zeros(400, 400, CV_8UC3);
-
-    // Draw a solid green circle in the center
     cv::circle(image, cv::Point(200, 200), 100, cv::Scalar(0, 255, 0), -1);
+    cv::imshow("OpenCV + OpenVINO Demo", image);
 
-    // Display the image in a window
-    cv::imshow("OpenCV + Conan Demo", image);
-
-    // Wait for a key press before closing the window
+    std::cout << "\nPress any key in the image window to exit." << std::endl;
     cv::waitKey(0);
 
     return 0;
@@ -95,19 +118,19 @@ int main() {
 
 ## Step 2: Build the Project
 
-With all three files in place, open your terminal (PowerShell or CMD) and navigate to your project's root folder. Run the following commands in order.
+Open a terminal (PowerShell or CMD) in your project's root folder and run these commands in order.
 
 ### 1. Install Dependencies
 
-This command reads your `conanfile.txt` and downloads/builds the correct libraries.
+This is the most critical command. We override the default C++ standard to C++17 to satisfy OpenVINO's requirements.
 
 ```powershell
-conan install . --build=missing
+conan install . --build=missing -s compiler.cppstd=17
 ```
 
-### 2. Configure the Build
+### 2. Configure the Project
 
-This command runs CMake to prepare the build system. It reads the presets automatically generated by Conan.
+This command runs CMake to prepare the build system using the presets generated by Conan.
 
 ```powershell
 cmake --preset conan-default
@@ -115,29 +138,33 @@ cmake --preset conan-default
 
 ### 3. Compile the Program
 
-This command compiles your `main.cpp` and links it with the libraries to create `main.exe`.
+This command compiles `main.cpp` and links all libraries to create `main.exe`.
 
 ```powershell
 cmake --build --preset conan-release
 ```
 
-After this step, you will have your executable located at `build\Release\main.exe`.
+Your executable will now be located at `build\Release\main.exe`.
 
 ---
 
 ## Step 3: Run the Application
 
-If you try to run `main.exe` directly, you will get an error about missing `.dll` files. This is because the program needs access to the shared libraries from OpenCV and its dependencies at runtime.
+To run the program, you must first resolve the "missing DLL" errors by copying all required shared libraries into the same directory as your executable.
 
 ### 1. Copy the Required DLLs
 
-You must copy the necessary `.dll` files from the Conan cache into the same directory as your `main.exe`.
-
 * **Your Executable's Location:** `build\Release\`
-* **DLLs to Copy:**
-    1.  **OpenCV DLLs:** Find them in a path like `C:\Users\YourUser\.conan2\p\openc...<hash>...\p\bin\`. Copy all the `.dll` files.
-    2.  **LZMA DLL:** Find it in a path like `C:\Users\YourUser\.conan2\p\xz_ut...<hash>...\p\bin\`. Copy the `liblzma.dll` file.
 
+* **DLLs to Copy from the Conan Cache (`C:\Users\YourUser\.conan2\p\`)**:
+    1.  **OpenVINO DLLs:** From the `openv...<hash>...\p\bin\` folder.
+    2.  **OpenCV DLLs:** From the `openc...<hash>...\p\bin\` folder.
+    3.  **TBB DLL (`tbb12.dll`):** From the `onetb...<hash>...\p\bin\` folder.
+    4.  **LZMA DLL (`liblzma.dll`):** From the `xz_ut...<hash>...\p\bin\` folder.
+    5.  **Other Dependencies:** If you encounter more missing DLL errors, find the corresponding package in the Conan cache and copy its DLLs from its `bin` folder.
+    6.  in this repo i have put tbb12.dll and libzma.dll 
+
+    
 Paste all these DLLs into the `build\Release\` folder alongside `main.exe`.
 
 ### 2. Run the Program
@@ -148,4 +175,4 @@ Now, you can run your program from the terminal:
 .\build\Release\main.exe
 ```
 
-A window titled "OpenCV + Conan Demo" will appear, showing a green circle. Congratulations, you have successfully built and run an OpenCV application using a modern C++ workflow!
+The terminal will display the version information for both libraries, and a window with a green circle will appear. Congratulations, your combined AI and computer vision project is running!
