@@ -1,0 +1,13 @@
+[requires]
+opencv/4.11.0
+xz_utils/5.4.5
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
+
+[options]
+xz_utils/*:shared=True
